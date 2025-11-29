@@ -1,9 +1,10 @@
 import sys
+import random
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QTableWidget, 
                              QTableWidgetItem, QTextEdit, QHeaderView, QMessageBox, 
-                             QGroupBox, QSpinBox)
-from PyQt6.QtCore import Qt
+                             QGroupBox, QSpinBox, QSplitter)
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor, QBrush
 
 # ==========================================
@@ -144,14 +145,14 @@ class TransportationSolver:
         return None
 
 # ==========================================
-#  NATIVE SYSTEM GUI
+#  RESIZABLE GUI
 # ==========================================
 
 class NativeTransportApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Optimal Delivery Allocation System")
-        self.resize(1000, 800)
+        self.resize(1000, 900)
         self.setup_ui()
 
     def setup_ui(self):
@@ -159,9 +160,9 @@ class NativeTransportApp(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout.setSpacing(10)
 
-        # 1. Header
+        # --- 1. Header (Fixed) ---
         title = QLabel("Optimal Delivery Allocation System")
         font = title.font()
         font.setPointSize(16)
@@ -174,11 +175,10 @@ class NativeTransportApp(QMainWindow):
         main_layout.addWidget(title)
         main_layout.addWidget(subtitle)
 
-        # 2. Controls Area (Using QGroupBox for native grouping)
+        # --- 2. Configuration (Fixed) ---
         config_group = QGroupBox("Configuration")
         config_layout = QHBoxLayout(config_group)
         
-        # Warehouse Input (Standard QSpinBox)
         config_layout.addWidget(QLabel("Number of Warehouses:"))
         self.spin_rows = QSpinBox()
         self.spin_rows.setRange(2, 50)
@@ -188,7 +188,6 @@ class NativeTransportApp(QMainWindow):
 
         config_layout.addSpacing(20)
 
-        # Destination Input (Standard QSpinBox)
         config_layout.addWidget(QLabel("Number of Destinations:"))
         self.spin_cols = QSpinBox()
         self.spin_cols.setRange(2, 50)
@@ -198,38 +197,63 @@ class NativeTransportApp(QMainWindow):
 
         config_layout.addStretch()
 
-        # Generate Button
-        self.btn_gen = QPushButton("Generate Matrix")
+        self.btn_gen = QPushButton("Generate Empty Grid")
         self.btn_gen.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_gen.clicked.connect(self.generate_grid)
         config_layout.addWidget(self.btn_gen)
+
+        self.btn_random = QPushButton("Random Balanced Data")
+        self.btn_random.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_random.clicked.connect(self.generate_random_data)
+        config_layout.addWidget(self.btn_random)
         
         main_layout.addWidget(config_group)
 
-        # 3. Data Grid
+        # --- 3. SPLITTER (Three Sections) ---
+        self.splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        # --- Section A: The Table (Top) ---
         self.table = QTableWidget()
-        self.table.setAlternatingRowColors(True) # Use system alternating colors
+        self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        main_layout.addWidget(self.table)
+        self.splitter.addWidget(self.table)
 
-        # 4. Action Button
+        # --- Section B: The Button (Fixed Height Middle) ---
+        self.btn_container = QWidget()
+        btn_layout = QVBoxLayout(self.btn_container)
+        
+        btn_layout.setContentsMargins(0, 5, 0, 5) 
+        btn_layout.setSpacing(0)
+        
         self.btn_solve = QPushButton("Calculate Optimal Allocation")
         self.btn_solve.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Increase font size slightly for emphasis, but keep native style
         btn_font = self.btn_solve.font()
         btn_font.setPointSize(11)
         btn_font.setBold(True)
         self.btn_solve.setFont(btn_font)
+        
         self.btn_solve.setFixedHeight(40)
         self.btn_solve.clicked.connect(self.run_solver)
-        main_layout.addWidget(self.btn_solve)
+        
+        btn_layout.addWidget(self.btn_solve)
+        self.btn_container.setFixedHeight(50)
+        
+        self.splitter.addWidget(self.btn_container)
 
-        # 5. Output Console
+        # --- Section C: Text Output (Bottom) ---
         self.txt_output = QTextEdit()
         self.txt_output.setReadOnly(True)
         self.txt_output.setPlaceholderText("Results will appear here...")
-        main_layout.addWidget(self.txt_output)
+        self.splitter.addWidget(self.txt_output)
+
+        # Splitter Configuration
+        self.splitter.setStretchFactor(0, 5) 
+        self.splitter.setStretchFactor(1, 0)
+        self.splitter.setStretchFactor(2, 3)
+        self.splitter.setCollapsible(1, False) 
+
+        main_layout.addWidget(self.splitter)
         
         # Initialize
         self.generate_grid()
@@ -237,37 +261,132 @@ class NativeTransportApp(QMainWindow):
     def generate_grid(self):
         rows = self.spin_rows.value()
         cols = self.spin_cols.value()
+        self._build_table_structure(rows, cols)
+        
+        for r in range(rows + 1):
+            for c in range(cols + 1):
+                if not self.table.item(r, c) or self.table.item(r,c).text() == "":
+                     self._set_cell(r, c, "0")
+        self._set_cell(rows,cols,"")
 
+    def generate_random_data(self):
+        rows = self.spin_rows.value()
+        cols = self.spin_cols.value()
+        self._build_table_structure(rows, cols)
+
+        # Fill Costs
+        for r in range(rows):
+            for c in range(cols):
+                self._set_cell(r, c, str(random.randint(10, 100)))
+
+        # Fill Supply & Demand
+        supplies = [random.randint(20, 100) for _ in range(rows)]
+        demands = [random.randint(20, 100) for _ in range(cols)]
+
+        # Balance
+        diff = sum(supplies) - sum(demands)
+        if diff > 0:
+            demands[random.randint(0, cols - 1)] += diff
+        elif diff < 0:
+            supplies[random.randint(0, rows - 1)] += abs(diff)
+
+        for r in range(rows):
+            self._set_cell(r, cols, str(supplies[r]))
+        for c in range(cols):
+            self._set_cell(rows, c, str(demands[c]))
+
+    def _build_table_structure(self, rows, cols):
+        """Helper to setup headers and row/col counts"""
         self.table.setRowCount(rows + 1)
         self.table.setColumnCount(cols + 1)
 
+        # 1. Set Default Headers (Will be updated dynamically)
         h_labels = [f"Dest {i+1}" for i in range(cols)] + ["SUPPLY"]
         v_labels = [f"Warehouse {i+1}" for i in range(rows)] + ["DEMAND"]
+        
         self.table.setHorizontalHeaderLabels(h_labels)
         self.table.setVerticalHeaderLabels(v_labels)
+        
+        # 2. Re-Connect Signals 
+        try:
+            self.table.horizontalHeader().sectionResized.disconnect()
+            self.table.verticalHeader().sectionResized.disconnect()
+        except:
+            pass
 
+        self.table.horizontalHeader().sectionResized.connect(self.update_h_headers)
+        self.table.verticalHeader().sectionResized.connect(self.update_v_headers)
+
+        # 3. Setup Cells
         for r in range(rows + 1):
             for c in range(cols + 1):
                 item = QTableWidgetItem("0")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                
-                # Logic for semantic hints using Standard Colors
+
                 if r == rows and c < cols:
-                    # Demand Row - Mild Red background hint
-                    # We use standard brushes to avoid dark mode clashes
-                    item.setBackground(QColor(255, 0, 0, 30)) # Very transparent red
-                    item.setToolTip("Enter Demand Here")
+                    item.setBackground(QColor(255, 0, 0, 30))
+                    item.setToolTip(f"Demand at Dest {c+1}")
                 elif r < rows and c == cols:
-                    # Supply Column - Mild Green background hint
-                    item.setBackground(QColor(0, 255, 0, 30)) # Very transparent green
-                    item.setToolTip("Enter Supply Here")
+                    item.setBackground(QColor(0, 255, 0, 30))
+                    item.setToolTip(f"Supply at Warehouse {r+1}")
                 elif r == rows and c == cols:
-                    # Corner - Disabled
                     item = QTableWidgetItem("")
                     item.setFlags(Qt.ItemFlag.NoItemFlags)
                     item.setBackground(Qt.GlobalColor.lightGray)
                 
                 self.table.setItem(r, c, item)
+        
+        # 4. FORCE UPDATE: Use QTimer to wait for the layout to apply Stretch, then check text
+        QTimer.singleShot(0, self.force_header_update)
+
+    def force_header_update(self):
+        """Manually runs the update logic for all headers to catch initial compressed states"""
+        cols = self.table.columnCount()
+        rows = self.table.rowCount()
+        
+        for c in range(cols):
+            self.update_h_headers(c, 0, self.table.columnWidth(c))
+            
+        for r in range(rows):
+            self.update_v_headers(r, 0, self.table.rowHeight(r))
+
+    # --- DYNAMIC HEADER LOGIC ---
+    def update_h_headers(self, logicalIndex, oldSize, newSize):
+        """Switches between 'Dest X' and 'DX' based on column width"""
+        is_supply = (logicalIndex == self.table.columnCount() - 1)
+        
+        if is_supply:
+            text = "SUPPLY" if newSize > 70 else "SUP"
+        else:
+            if newSize < 65:
+                text = f"D{logicalIndex + 1}"
+            else:
+                text = f"Dest {logicalIndex + 1}"
+
+        item = self.table.horizontalHeaderItem(logicalIndex)
+        if item and item.text() != text:
+            item.setText(text)
+
+    def update_v_headers(self, logicalIndex, oldSize, newSize):
+        """Switches between 'Warehouse X' and 'WX' based on row height"""
+        is_demand = (logicalIndex == self.table.rowCount() - 1)
+        
+        if is_demand:
+            text = "DEMAND" if newSize > 70 else "DEM"
+        else:
+            if newSize < 100:
+                text = f"W{logicalIndex + 1}"
+            else:
+                text = f"Warehouse {logicalIndex + 1}"
+
+        item = self.table.verticalHeaderItem(logicalIndex)
+        if item and item.text() != text:
+            item.setText(text)
+
+    def _set_cell(self, r, c, value):
+        item = self.table.item(r, c)
+        if item:
+            item.setText(value)
 
     def run_solver(self):
         try:
@@ -302,19 +421,13 @@ class NativeTransportApp(QMainWindow):
             solver = TransportationSolver(costs, supply, demand)
             allocation, min_cost, logs = solver.solve()
 
-            # HTML Output using standard colors
             html = "<h3>Optimization Process Logs:</h3>"
             for msg, style in logs:
-                if style == "header": 
-                    html += f"<b>{msg}</b><br>"
-                elif style == "success": 
-                    html += f"<span style='color:green'><b>{msg}</b></span><br>"
-                elif style == "error": 
-                    html += f"<span style='color:red'><b>{msg}</b></span><br>"
-                elif style == "highlight": 
-                    html += f"<span style='color:orange'><b>{msg}</b></span><br>"
-                else:
-                    html += f"{msg}<br>"
+                if style == "header": html += f"<b>{msg}</b><br>"
+                elif style == "success": html += f"<span style='color:green'><b>{msg}</b></span><br>"
+                elif style == "error": html += f"<span style='color:red'><b>{msg}</b></span><br>"
+                elif style == "highlight": html += f"<span style='color:orange'><b>{msg}</b></span><br>"
+                else: html += f"{msg}<br>"
             
             html += "<hr>"
             html += f"<h2>MINIMUM TOTAL COST: ${min_cost}</h2>"
@@ -327,7 +440,8 @@ class NativeTransportApp(QMainWindow):
                     if qty > 0:
                         unit_c = costs[r][c]
                         sub = qty * unit_c
-                        html += f"<tr><td>Warehouse {r+1}</td><td>Dest {c+1}</td>"
+                        # OUTPUT TABLE: Also uses W/D format to match grid
+                        html += f"<tr><td>W{r+1}</td><td>D{c+1}</td>"
                         html += f"<td><b>{int(qty)}</b></td><td>${unit_c}</td><td>${sub}</td></tr>"
             html += "</table>"
 
@@ -340,8 +454,6 @@ class NativeTransportApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # The default style depends on the OS (Fusion is a good neutral fallback if needed)
-    # app.setStyle("Fusion") 
     window = NativeTransportApp()
     window.show()
     sys.exit(app.exec())
