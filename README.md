@@ -12,7 +12,6 @@ This desktop application minimizes transportation costs by optimally allocating 
 - [Prerequisites](#-prerequisites)
 - [Installation & Setup](#-installation--setup)
 - [How to Run](#-how-to-run)
-- [Building a Standalone App (.exe)](#-building-a-standalone-app-exe)
 - [Algorithms Used](#-algorithms-used)
 - [Project Team](#-project-team)
 
