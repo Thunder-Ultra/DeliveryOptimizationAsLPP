@@ -75,7 +75,7 @@ class TransportationSolver:
 
             iteration += 1
 
-        return self.allocation, self.calculate_total_cost(), self.logs
+        return self.allocation, round(self.calculate_total_cost(),0), self.logs
 
     def nwcm(self):
         r, c = 0, 0
