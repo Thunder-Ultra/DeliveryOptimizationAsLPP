@@ -74,8 +74,6 @@ Once dependencies are installed, you can run the application directly:
 python tpp_solver_pyqt6.py
 ```
 
-_(Note: Replace `transport_solver.py` with whatever you named the python file)_
-
 ---
 
 ## 🧠 Algorithms Used
