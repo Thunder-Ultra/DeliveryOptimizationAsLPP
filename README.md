@@ -79,28 +79,6 @@ _(Note: Replace `transport_solver.py` with whatever you named the python file)_
 
 ---
 
-## 📦 Building a Standalone App (.exe)
-
-If you want to send this program to a teacher or friend who **does not** have Python installed, you can convert it into a single `.exe` file.
-
-1.  **Install PyInstaller:**
-
-    ```bash
-    pip install pyinstaller
-    ```
-
-2.  **Build the Executable:**
-    Run this command in your terminal:
-
-    ```bash
-    pyinstaller --onefile --noconsole --name="DeliveryOptimizer" transport_solver.py
-    ```
-
-3.  **Locate the File:**
-    Go to the `dist/` folder. You will find `DeliveryOptimizer.exe`. You can copy this file to any Windows computer, and it will run instantly.
-
----
-
 ## 🧠 Algorithms Used
 
 ### 1. North West Corner Method (NWCM)
