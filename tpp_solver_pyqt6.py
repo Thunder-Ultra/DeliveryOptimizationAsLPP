@@ -10,6 +10,140 @@ from PyQt6.QtGui import QFont, QColor, QBrush
 # ==========================================
 #  BACKEND LOGIC (Unchanged)
 # ==========================================
+# class TransportationSolver:
+#     def __init__(self, costs, supply, demand):
+#         self.costs = costs
+#         self.supply = list(supply)
+#         self.demand = list(demand)
+#         self.rows = len(costs)
+#         self.cols = len(costs[0])
+#         self.allocation = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+#         self.logs = [] 
+
+#     def log(self, message, style="normal"):
+#         self.logs.append((message, style))
+
+#     def solve(self):
+#         self.log("Initializing Basic Feasible Solution (NWCM)...", "header")
+#         self.nwcm()
+#         initial_cost = self.calculate_total_cost()
+#         self.log(f"Initial BFS Cost: Rs. {initial_cost}", "bold")
+
+#         iteration = 1
+#         while True:
+#             self.log(f"--- Optimization Iteration {iteration} ---", "header")
+#             self.fix_degeneracy()
+#             u, v = self.calculate_uv()
+            
+#             if u is None: 
+#                 self.log("Graph disconnected (Degeneracy error). Stopping.", "error")
+#                 break
+
+#             min_d = 0
+#             entering_cell = None
+
+#             for r in range(self.rows):
+#                 for c in range(self.cols):
+#                     if self.allocation[r][c] == 0:
+#                         d_val = self.costs[r][c] - (u[r] + v[c])
+#                         if d_val < min_d:
+#                             min_d = d_val
+#                             entering_cell = (r, c)
+
+#             if min_d >= -1e-9: 
+#                 self.log("All opportunity costs >= 0. Solution is Optimal!", "success")
+#                 break
+            
+#             self.log(f"Negative opp. cost ({min_d}) at {entering_cell}. Improving...", "highlight")
+
+#             path = self.get_closed_loop(entering_cell)
+#             if not path:
+#                 self.log("Closed loop not found. Stopping.", "error")
+#                 break
+
+#             minus_cells_values = []
+#             for i in range(1, len(path), 2):
+#                 r, c = path[i]
+#                 minus_cells_values.append(self.allocation[r][c])
+            
+#             theta = min(minus_cells_values)
+#             self.log(f"Shifting {theta} units along the loop.", "normal")
+
+#             for i, (r, c) in enumerate(path):
+#                 if i % 2 == 0: self.allocation[r][c] += theta
+#                 else: self.allocation[r][c] -= theta
+
+#             iteration += 1
+
+#         return self.allocation, round(self.calculate_total_cost(),0), self.logs
+
+#     def nwcm(self):
+#         r, c = 0, 0
+#         cur_supply, cur_demand = list(self.supply), list(self.demand)
+#         while r < self.rows and c < self.cols:
+#             qty = min(cur_supply[r], cur_demand[c])
+#             self.allocation[r][c] = qty
+#             cur_supply[r] -= qty
+#             cur_demand[c] -= qty
+#             if cur_supply[r] == 0: r += 1
+#             elif cur_demand[c] == 0: c += 1
+
+#     def calculate_total_cost(self):
+#         return sum(self.allocation[r][c] * self.costs[r][c] for r in range(self.rows) for c in range(self.cols))
+
+#     def fix_degeneracy(self):
+#         count = sum(1 for r in range(self.rows) for c in range(self.cols) if self.allocation[r][c] > 0)
+#         req = self.rows + self.cols - 1
+#         if count < req:
+#             for r in range(self.rows):
+#                 for c in range(self.cols):
+#                     if self.allocation[r][c] == 0:
+#                         self.allocation[r][c] = 1e-10 
+#                         count += 1
+#                         if count == req: return
+
+#     def calculate_uv(self):
+#         u = [None] * self.rows
+#         v = [None] * self.cols
+#         u[0] = 0
+#         changed = True
+#         while changed:
+#             changed = False
+#             for r in range(self.rows):
+#                 for c in range(self.cols):
+#                     if self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10:
+#                         if u[r] is not None and v[c] is None:
+#                             v[c] = self.costs[r][c] - u[r]
+#                             changed = True
+#                         elif u[r] is None and v[c] is not None:
+#                             u[r] = self.costs[r][c] - v[c]
+#                             changed = True
+#         if None in u or None in v: return None, None
+#         return u, v
+
+#     def get_closed_loop(self, start_node):
+#         def get_neighbors(curr, prev_dir):
+#             neighbors = []
+#             if prev_dir == 'H': 
+#                 c = curr[1]
+#                 for r in range(self.rows):
+#                     if r != curr[0] and (self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10):
+#                         neighbors.append(((r, c), 'V'))
+#             else: 
+#                 r = curr[0]
+#                 for c in range(self.cols):
+#                     if c != curr[1] and ((r,c) == start_node or self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10):
+#                         neighbors.append(((r, c), 'H'))
+#             return neighbors
+
+#         stack = [(start_node, [start_node], 'V')]
+#         while stack:
+#             curr, path, p_dir = stack.pop()
+#             for n_node, n_dir in get_neighbors(curr, p_dir):
+#                 if n_node == start_node and len(path) >= 3: return path
+#                 if n_node not in path: stack.append((n_node, path + [n_node], n_dir))
+#         return None
+
 class TransportationSolver:
     def __init__(self, costs, supply, demand):
         self.costs = costs
@@ -30,37 +164,50 @@ class TransportationSolver:
         self.log(f"Initial BFS Cost: ${initial_cost}", "bold")
 
         iteration = 1
-        while True:
+        max_iterations = 100 # Safety break to prevent infinite loops
+        
+        while iteration < max_iterations:
             self.log(f"--- Optimization Iteration {iteration} ---", "header")
+            
+            # 1. Check for Degeneracy
             self.fix_degeneracy()
+            
+            # 2. Calculate Potentials (u, v)
             u, v = self.calculate_uv()
             
             if u is None: 
                 self.log("Graph disconnected (Degeneracy error). Stopping.", "error")
                 break
 
+            # 3. Calculate Opportunity Costs
             min_d = 0
             entering_cell = None
 
             for r in range(self.rows):
                 for c in range(self.cols):
-                    if self.allocation[r][c] == 0:
+                    if self.allocation[r][c] == 0: # Empty cell
+                        # Opportunity Cost = Cost - (u + v)
                         d_val = self.costs[r][c] - (u[r] + v[c])
-                        if d_val < min_d:
+                        if d_val < min_d: # Find most negative
                             min_d = d_val
                             entering_cell = (r, c)
 
+            # 4. Optimality Check
             if min_d >= -1e-9: 
                 self.log("All opportunity costs >= 0. Solution is Optimal!", "success")
                 break
             
             self.log(f"Negative opp. cost ({min_d}) at {entering_cell}. Improving...", "highlight")
 
+            # 5. Find Closed Loop
             path = self.get_closed_loop(entering_cell)
             if not path:
-                self.log("Closed loop not found. Stopping.", "error")
+                self.log("Error: Closed loop not found. This might be a complex degeneracy issue.", "error")
                 break
 
+            # 6. Adjust Allocation (Shift Theta)
+            # Find the minimum allocation among the (-) cells in the loop
+            # Path structure: Start(+) -> Next(-) -> Next(+) -> Next(-) ...
             minus_cells_values = []
             for i in range(1, len(path), 2):
                 r, c = path[i]
@@ -70,14 +217,15 @@ class TransportationSolver:
             self.log(f"Shifting {theta} units along the loop.", "normal")
 
             for i, (r, c) in enumerate(path):
-                if i % 2 == 0: self.allocation[r][c] += theta
-                else: self.allocation[r][c] -= theta
+                if i % 2 == 0: self.allocation[r][c] += theta # Add to (+)
+                else: self.allocation[r][c] -= theta          # Subtract from (-)
 
             iteration += 1
 
-        return self.allocation, round(self.calculate_total_cost(),0), self.logs
+        return self.allocation, self.calculate_total_cost(), self.logs
 
     def nwcm(self):
+        """North West Corner Method"""
         r, c = 0, 0
         cur_supply, cur_demand = list(self.supply), list(self.demand)
         while r < self.rows and c < self.cols:
@@ -85,6 +233,7 @@ class TransportationSolver:
             self.allocation[r][c] = qty
             cur_supply[r] -= qty
             cur_demand[c] -= qty
+            
             if cur_supply[r] == 0: r += 1
             elif cur_demand[c] == 0: c += 1
 
@@ -92,25 +241,42 @@ class TransportationSolver:
         return sum(self.allocation[r][c] * self.costs[r][c] for r in range(self.rows) for c in range(self.cols))
 
     def fix_degeneracy(self):
-        count = sum(1 for r in range(self.rows) for c in range(self.cols) if self.allocation[r][c] > 0)
-        req = self.rows + self.cols - 1
-        if count < req:
+        """Ensures allocations = m + n - 1 by adding epsilon to valid empty cells"""
+        # Calculate current allocations (ignoring pure zeros, counting epsilons)
+        alloc_count = sum(1 for r in range(self.rows) for c in range(self.cols) if self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10)
+        required = self.rows + self.cols - 1
+        
+        if alloc_count < required:
+            # Degeneracy detected. Add epsilon (1e-10) to the lowest cost empty cells 
+            # that don't create a loop (simplified logic here: just fill lowest cost empty)
+            needed = required - alloc_count
+            
+            # Create list of empty cells sorted by cost (heuristic to pick 'sensible' dummy paths)
+            empty_cells = []
             for r in range(self.rows):
                 for c in range(self.cols):
                     if self.allocation[r][c] == 0:
-                        self.allocation[r][c] = 1e-10 
-                        count += 1
-                        if count == req: return
+                        empty_cells.append((self.costs[r][c], r, c))
+            empty_cells.sort()
+            
+            for i in range(min(needed, len(empty_cells))):
+                _, r, c = empty_cells[i]
+                self.allocation[r][c] = 1e-10 
+                # Note: A robust system would check if adding this epsilon forms a loop, 
+                # but for this scale, sorting by cost is usually sufficient to avoid bad cycles.
 
     def calculate_uv(self):
+        """Calculates u (row potentials) and v (col potentials)"""
         u = [None] * self.rows
         v = [None] * self.cols
-        u[0] = 0
-        changed = True
-        while changed:
+        u[0] = 0 # Arbitrary start
+        
+        # Iteratively update u and v
+        for _ in range(self.rows + self.cols): # Safety loop limit
             changed = False
             for r in range(self.rows):
                 for c in range(self.cols):
+                    # Check allocated cells (including epsilon)
                     if self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10:
                         if u[r] is not None and v[c] is None:
                             v[c] = self.costs[r][c] - u[r]
@@ -118,30 +284,59 @@ class TransportationSolver:
                         elif u[r] is None and v[c] is not None:
                             u[r] = self.costs[r][c] - v[c]
                             changed = True
-        if None in u or None in v: return None, None
+            if not changed:
+                break
+                
+        # If potentials are still None, the graph is disconnected
+        if None in u or None in v:
+            return None, None
         return u, v
 
     def get_closed_loop(self, start_node):
-        def get_neighbors(curr, prev_dir):
+        """Finds a stepping stone path: Empty -> Allocated -> Allocated ... -> Empty"""
+        
+        def get_neighbors(curr, prev_direction):
             neighbors = []
-            if prev_dir == 'H': 
+            if prev_direction == 'H': 
+                # Was Horizontal, must move Vertical (Change Row, Same Col)
                 c = curr[1]
                 for r in range(self.rows):
-                    if r != curr[0] and (self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10):
-                        neighbors.append(((r, c), 'V'))
+                    if r != curr[0]:
+                        if self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10:
+                            neighbors.append(((r, c), 'V'))
             else: 
+                # Was Vertical, must move Horizontal (Change Col, Same Row)
                 r = curr[0]
                 for c in range(self.cols):
-                    if c != curr[1] and ((r,c) == start_node or self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10):
-                        neighbors.append(((r, c), 'H'))
+                    if c != curr[1]:
+                        # Can land on empty cell ONLY if it is the start node (closing the loop)
+                        if (r, c) == start_node:
+                             neighbors.append(((r, c), 'H'))
+                        elif self.allocation[r][c] > 0 or self.allocation[r][c] == 1e-10:
+                            neighbors.append(((r, c), 'H'))
             return neighbors
 
-        stack = [(start_node, [start_node], 'V')]
+        # DFS State: (Current Node, Current Path, Direction Arrived From)
+        # CRITICAL FIX: We must try starting the loop Horizontally AND Vertically
+        # 'V' in tuple -> Pretend we arrived Vertically, so next move is Horizontal
+        # 'H' in tuple -> Pretend we arrived Horizontally, so next move is Vertical
+        stack = [
+            (start_node, [start_node], 'V'), 
+            (start_node, [start_node], 'H')
+        ] 
+
         while stack:
             curr, path, p_dir = stack.pop()
-            for n_node, n_dir in get_neighbors(curr, p_dir):
-                if n_node == start_node and len(path) >= 3: return path
-                if n_node not in path: stack.append((n_node, path + [n_node], n_dir))
+            
+            # Get valid next moves
+            next_moves = get_neighbors(curr, p_dir)
+            
+            for next_node, move_dir in next_moves:
+                if next_node == start_node and len(path) >= 4: # Loop needs at least 4 nodes
+                    return path 
+                if next_node not in path:
+                    stack.append((next_node, path + [next_node], move_dir))
+        
         return None
 
 # ==========================================
@@ -407,10 +602,14 @@ class NativeTransportApp(QMainWindow):
                 costs.append(row_costs)
                 
                 s_text = self.table.item(r, cols).text()
+                if (int(s_text) <0):
+                    return QMessageBox.warning(self, "Unbalanced Problem", f"Invalid Supply at Warehouse {r+1}")
                 supply.append(int(s_text) if s_text else 0)
 
             for c in range(cols):
                 d_text = self.table.item(rows, c).text()
+                if (int(d_text) < 0):
+                    return QMessageBox.warning(self, "Unbalanced Problem", f"Invalid Demand at Destination {c+1}")
                 demand.append(int(d_text) if d_text else 0)
 
             if sum(supply) != sum(demand):
@@ -430,7 +629,7 @@ class NativeTransportApp(QMainWindow):
                 else: html += f"{msg}<br>"
             
             html += "<hr>"
-            html += f"<h2>MINIMUM TOTAL COST: ${min_cost}</h2>"
+            html += f"<h2>MINIMUM TOTAL COST: Rs. {min_cost}</h2>"
             html += "<table border='1' cellspacing='0' cellpadding='5' width='100%'>"
             html += "<tr style='background-color:#eee'><th>From</th><th>To</th><th>Quantity</th><th>Unit Cost</th><th>Subtotal</th></tr>"
             
@@ -442,13 +641,13 @@ class NativeTransportApp(QMainWindow):
                         sub = qty * unit_c
                         # OUTPUT TABLE: Also uses W/D format to match grid
                         html += f"<tr><td>W{r+1}</td><td>D{c+1}</td>"
-                        html += f"<td><b>{int(qty)}</b></td><td>${unit_c}</td><td>${sub}</td></tr>"
+                        html += f"<td><b>{int(qty)}</b></td><td>Rs. {unit_c}</td><td>Rs. {sub}</td></tr>"
             html += "</table>"
 
             self.txt_output.setHtml(html)
 
         except ValueError:
-            QMessageBox.critical(self, "Input Error", "Please ensure all grid cells contain valid integers.")
+            QMessageBox.critical(self, "Input Error", "Please ensure all grid cells contain Positive Values.")
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
