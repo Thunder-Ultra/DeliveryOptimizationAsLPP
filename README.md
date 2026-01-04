@@ -12,7 +12,6 @@ This desktop application minimizes transportation costs by optimally allocating 
 - [Prerequisites](#-prerequisites)
 - [Installation & Setup](#-installation--setup)
 - [How to Run](#-how-to-run)
-- [Building a Standalone App (.exe)](#-building-a-standalone-app-exe)
 - [Algorithms Used](#-algorithms-used)
 - [Project Team](#-project-team)
 
@@ -72,10 +71,8 @@ Before running the application, ensure you have the following installed:
 Once dependencies are installed, you can run the application directly:
 
 ```bash
-python transport_solver.py
+python tpp_solver_pyqt6.py
 ```
-
-_(Note: Replace `transport_solver.py` with whatever you named the python file)_
 
 ---
 
